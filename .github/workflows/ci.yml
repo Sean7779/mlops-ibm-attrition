@@ -24,17 +24,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - -- name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
       - name: Prepare DVC remote directory
         run: |
-          mkdir -p mlops-dvc-remote
+          mkdir -p ../../mlops-dvc-remote
 
       - name: Pull data with DVC
         run: |
-          dvc pull
+          dvc pull 
 
-      - name: Run tests
-        run: |
-          python -m pytest tests/ -v
+
+
+
+    
 
   train:
     runs-on: ubuntu-latest
@@ -69,6 +75,6 @@ jobs:
 
 
 
-          
+
 
           

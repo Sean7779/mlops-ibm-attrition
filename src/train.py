@@ -4,18 +4,20 @@ import yaml
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import mlflow
 import mlflow.sklearn
+
+
+
+from src.evaluate import evaluate_classification
 
 
 def load_config(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as file:
         config = yaml.safe_load(file)
-
     return config
 
 
@@ -47,6 +49,8 @@ def train_model(
     data_path: str = None,
     config_path: str = "configs/config.yaml",
     log_to_mlflow: bool = False,
+    max_iter_override: int = None,
+    split_random_state_override: int = None,
 ):
     config = load_config(config_path)
 
@@ -58,6 +62,12 @@ def train_model(
     split_random_state = config["split"]["random_state"]
     max_iter = config["model"]["max_iter"]
     model_random_state = config["model"]["random_state"]
+
+    if max_iter_override is not None:
+        max_iter = max_iter_override
+
+    if split_random_state_override is not None:
+        split_random_state = split_random_state_override
 
     df = load_training_data(data_path)
     X, y = prepare_features_and_target(df, target_column=target_column)
@@ -76,8 +86,11 @@ def train_model(
     numeric_transformer = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
         ]
     )
+
+    
 
     categorical_transformer = Pipeline(
         steps=[
@@ -108,11 +121,7 @@ def train_model(
     y_pred = model.predict(X_test)
     y_proba = model.predict_proba(X_test)[:, 1]
 
-    metrics = {
-        "accuracy": accuracy_score(y_test, y_pred),
-        "f1_score": f1_score(y_test, y_pred),
-        "roc_auc": roc_auc_score(y_test, y_proba),
-    }
+    metrics = evaluate_classification(y_test, y_pred, y_proba)
 
     if log_to_mlflow:
         with mlflow.start_run():
@@ -126,7 +135,10 @@ def train_model(
                     "model_random_state": model_random_state,
                 }
             )
-            mlflow.log_metrics(metrics)
+
+            for key, value in metrics.items():
+                mlflow.log_metric(key, value)
+
             mlflow.set_tag("model_type", "logistic_regression")
             mlflow.sklearn.log_model(model, artifact_path="model")
 
@@ -134,7 +146,10 @@ def train_model(
 
 
 if __name__ == "__main__":
-    train_model(log_to_mlflow=True) 
+    train_model(log_to_mlflow=True)
+
+
+
 
     
 
